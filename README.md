@@ -29,3 +29,12 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 ```
+
+
+## License
+
+Licensed under the [BlueOak Model License 1.0.0](LICENSE.md) — _[Contributions via DCO 1.1](contributing.md#developers-certificate-of-origin)_
+
+[tide::Request]: https://docs.rs/tide/0.15.0/tide/struct.Request.html
+[Diesel]: https://github.com/diesel-rs/diesel
+[Tide]: https://github.com/http-rs/tide
