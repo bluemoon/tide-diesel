@@ -1,0 +1,30 @@
+[package]
+name = "tide-diesel"
+version = "0.1.0"
+authors = [
+    "Bradford Toney <bradford.toney@gmail.com>",
+]
+edition = "2018"
+license = "BlueOak-1.0.0"
+description = "Tide middleware for Diesel pooled connections & transactions."
+readme = "README.md"
+repository = "https://github.com/bluemoon/tide-diesel"
+keywords = ["tide", "middleware", "diesel", "postgres", "transaction"]
+categories = [
+  "web-programming::http-server"
+]
+
+[dependencies]
+async-std = "1"
+
+[dependencies.tide]
+version = "0.16"
+default-features = false
+
+[dependencies.diesel]
+version = "1.4.8"
+features = ["postgres", "extras"]
+
+[dev-dependencies]
+anyhow = "1"
+
