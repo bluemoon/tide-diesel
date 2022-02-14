@@ -1,13 +1,13 @@
-use std::sync::Arc;
-
 use async_std::sync::{Mutex, MutexGuard};
 use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection},
     PgConnection,
 };
+use std::sync::Arc;
 use tide::{utils::async_trait, Middleware, Next, Request};
 
 pub type PooledPgConn = PooledConnection<ConnectionManager<PgConnection>>;
+pub type PoolPgConn = Pool<ConnectionManager<PgConnection>>;
 
 #[derive(Clone)]
 pub struct DieselMiddleware {
@@ -18,7 +18,6 @@ impl DieselMiddleware {
     pub fn new(db_uri: &'_ str) -> std::result::Result<Self, Box<dyn std::error::Error>> {
         let manager = ConnectionManager::<PgConnection>::new(db_uri);
         let pg_conn = diesel::r2d2::Builder::<ConnectionManager<PgConnection>>::new()
-            .max_size(2)
             .build(manager)
             .map_err(|e| Box::new(e))?;
         Ok(Self { pool: pg_conn })
@@ -43,11 +42,11 @@ where
     State: Clone + Send + Sync + 'static,
 {
     async fn handle(&self, mut req: Request<State>, next: Next<'_, State>) -> tide::Result {
-        if req.ext::<Arc<Mutex<PooledPgConn>>>().is_some() {
+        if req.ext::<Arc<Mutex<PoolPgConn>>>().is_some() {
             return Ok(next.run(req).await);
         }
 
-        let conn: Arc<Mutex<PooledPgConn>> = Arc::new(Mutex::new(self.pool.get()?));
+        let conn: Arc<PoolPgConn> = Arc::new(self.pool.clone());
         req.set_ext(conn.clone());
         let res = next.run(req).await;
         Ok(res)
@@ -56,15 +55,24 @@ where
 
 #[async_trait]
 pub trait DieselRequestExt {
-    async fn pg_conn<'req>(&'req self) -> MutexGuard<'req, PooledPgConn>;
+    async fn pg_conn<'req>(
+        &'req self,
+    ) -> std::result::Result<PooledPgConn, Box<dyn std::error::Error + Send + Sync>>;
+    async fn pg_pool_conn<'req>(&'req self) -> MutexGuard<'req, PoolPgConn>;
 }
 
 #[async_trait]
 impl<T: Send + Sync + 'static> DieselRequestExt for Request<T> {
-    async fn pg_conn<'req>(&'req self) -> MutexGuard<'req, PooledPgConn> {
-        let pg_conn: &Arc<Mutex<PooledPgConn>> =
-            self.ext().expect("You must install Diesel middleware");
+    async fn pg_conn<'req>(
+        &'req self,
+    ) -> std::result::Result<PooledPgConn, Box<dyn std::error::Error + Send + Sync>> {
+        let pg_conn: &Arc<PoolPgConn> = self.ext().expect("You must install Diesel middleware");
+        Ok(pg_conn.get()?)
+    }
 
+    async fn pg_pool_conn<'req>(&'req self) -> MutexGuard<'req, PoolPgConn> {
+        let pg_conn: &Arc<Mutex<PoolPgConn>> =
+            self.ext().expect("You must install Diesel middleware");
         pg_conn.lock().await
     }
 }
