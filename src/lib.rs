@@ -57,7 +57,7 @@ where
 pub trait DieselRequestExt {
     async fn pg_conn<'req>(
         &'req self,
-    ) -> std::result::Result<PooledPgConn, Box<dyn std::error::Error + Send + Sync>>;
+    ) -> std::result::Result<PooledPgConn, Box<dyn std::error::Error + Send + Sync + 'static>>;
     async fn pg_pool_conn<'req>(&'req self) -> MutexGuard<'req, PoolPgConn>;
 }
 
@@ -65,9 +65,9 @@ pub trait DieselRequestExt {
 impl<T: Send + Sync + 'static> DieselRequestExt for Request<T> {
     async fn pg_conn<'req>(
         &'req self,
-    ) -> std::result::Result<PooledPgConn, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> std::result::Result<PooledPgConn, Box<dyn std::error::Error + Send + Sync + 'static>> {
         let pg_conn: &Arc<PoolPgConn> = self.ext().expect("You must install Diesel middleware");
-        Ok(pg_conn.get()?)
+        Ok(pg_conn.get().map_err(|e| Box::new(e))?)
     }
 
     async fn pg_pool_conn<'req>(&'req self) -> MutexGuard<'req, PoolPgConn> {
